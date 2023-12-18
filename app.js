@@ -24,6 +24,10 @@ acceptForgetPassword,
 findproduct,
 Add_To_Cart, 
 cart,
+paycart,
+Admins,
+adminlogin,
+updateproductbyId,
 paymentformenu} = require("./system");
 
 const{ Middlewareauthentication, checkUserRole, sendConfirmationEmailToAdmin }= require("./middleware/auth")
@@ -39,15 +43,19 @@ app.use(bodyparser.json());
 
 app.post("/signup", Signup);
 app.post("/login", Login);
+app.post("/adminsignup",Admins);
+app.post("/adminlogin", adminlogin);
+app.post("/productpayment", paycart);
 app.post("/login/menu",Middlewareauthentication,checkUserRole('seller'), Product2Menu);
 app.post("/forgetpassword", forgetpassword);
 app.get("/user/:UID", finduserId);
 app.get("/showmenu", showMenu)
+app.patch("/login/updatemenu", Middlewareauthentication,checkUserRole('seller'),  updateproductbyId)
 app.get("/user/menulist/:id", listmenubyID);
 app.patch("/updatemenu/:id", updatemenu);
 app.get("/user/:userID", getUser);
 app.patch("/user/:ID", updateUser);
-app.delete("/user/:ID", Middlewareauthentication, checkUserRole('seller'),deleteUser);
+app.delete("/user/:ID", Middlewareauthentication, checkUserRole('admin'),deleteUser);
 app.patch("/user/Changepassword", ChangePassword);
 app.post("/pay", pay);
 app.post("/webhook", webhook);

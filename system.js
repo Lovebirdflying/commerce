@@ -6,7 +6,7 @@ const bcrypt = require("bcrypt");
 const nodemailer = require("nodemailer")
 const jwt = require("jsonwebtoken")
 const crypto = require("crypto");
-const {usermodel, menumodel, tokenmodel, Cartmodel, purchaseddetails} = require("./helper/DB.js");
+const {usermodel, Admin, menumodel, tokenmodel, Cartmodel, purchaseddetails} = require("./helper/DB.js");
 const { gmail } = require("googleapis/build/src/apis/gmail/index.js");
 const { restart } = require("nodemon");
 const paystack = require("paystack")(
@@ -192,6 +192,67 @@ usermodel.findOne({email: data.email })
  //else { res.status(401).json({error: "Email does not exist"});}
 }
 
+//Admin signup
+
+const Admins = async (req, res, next) => {
+    try {
+        let {email,
+         password,
+         name} = req.body
+      
+
+        // Hash the password
+        const hashedPassword = await bcrypt.hash(password, 13);
+
+        const AdminsData = {
+            email,
+            password: hashedPassword,
+            name,
+            
+        };
+
+        const Nadmin = await Admin.create(AdminsData);
+        res.status(200).json({ message: "Admin Successfully Added", Nadmin });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Error registering admin', error });
+    }
+};
+
+const adminlogin = async (req, res, next) => {
+
+        try {
+            let {email, 
+             password } = req.body;
+    
+            const userAdmin = await Admin.findOne({ email });
+    
+            if (!userAdmin) {
+                res.status(400).json({ message: "Access Denied, you are not an Admin" });
+            } else {
+                // Compare the provided password with the hashed password in the database
+                const passwordMatch = await bcrypt.compare(password, userAdmin.password);
+    
+                if (passwordMatch) {
+                    const token = jwt.sign(
+                        { id: userAdmin.id, email: userAdmin.email },
+                        process.env.JWT_SECRET,
+                        { expiresIn: "1h" }
+                      );
+                    res.status(200).json({
+                        message: "Welcome Back Here Is Your Token: ", userAdmin, token
+                    });
+                } else {
+                    res.status(400).json({ message: "Incorrect password" });
+                }
+            }
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ message: "Can't login as Admin " });
+        }
+    };
+
+
 // add menu route to login
 const Product2Menu = async(req, res, next) => {
   var {product, 
@@ -268,6 +329,8 @@ function updatemenu(req, res, next){
         if(!menu){
             res.status(404).json({ message:" menu not found"});
         }else{
+
+
             menumodel.updateOne({_id: id}, updateM)
             .then(() => {
                 res.status(200).json({message: "Menu Updated Successfully"})
@@ -297,6 +360,55 @@ const showMenu = async(req, res, next) => {
     }
 }
 
+const updateproductbyId = (req, res, next) =>{
+    let id = req.params.id;
+    let email= req.body.email
+    const updatedMenu = req.body;
+
+  const user = usermodel.findOne({email})
+  if(!user){
+    return res.status(404).json({message:"Seller not found"})
+  }
+  else{
+   
+    if(updatedMenu.name){
+        user.name = updatedMenu.name;
+    
+    }
+    if(updatedMenu.email){
+        user.email = updatedMenu.email;
+    }
+    if(updatedMenu.password){
+        user.password = updatedMenu.password;
+    }
+
+    
+    if(!validpassword(updatedMenu.password)){
+        res.status(401).json({error:"Valid Password is required"});
+    
+        return;
+    }
+
+    menumodel.findById(id)
+        .then((menu) => {
+            if (!menu) {
+                res.status(404).json({ message: "Menu not found" });
+            } else {
+                menumodel.updateOne({ _id: id }, updatedMenu)
+                    .then(() => {
+                        res.status(200).json({ message: "Menu updated successfully",updatedMenu });
+                    })
+                    .catch((err) => {
+                        res.status(500).json({ message: "Failed to update menu" });
+                    });
+            }
+        })
+        .catch((err) => {
+            res.status(500).json({ message: "Unknown error occurred", err });
+        });
+  }
+
+};
 
 //owner create the product
 /*
@@ -429,53 +541,122 @@ const paymentformenu = async (req, res) => {
         product,
         price,
         quantity,
-          company,
-          location,
-          phoneNumber
+        company,
+        location,
+        phoneNumber
         } = req.body;
 
 try{
+    
+    const user = await usermodel.findOne({email})
+    if (!user) {
+      res.status(404).json({ message: "user not found, check the email" });
+    } else{     
+        const MProduct = await menumodel.findOne({ product }, { price });
+        if(MProduct){
+            const productprice = MProduct.price
+            let amountConverted = productprice * 100 ; //this take the price to 00
+            console.log("The amount converted:", amountConverted)
 
-    const productprice = price;
-    let amountConverted = productprice * 100 * quantity; //this take the price to 00
-    console.log(amountConverted)
-    const paymentReference = generatePaymentReference();
+            const paymentReference = generatePaymentReference();
+            const response = await paystack.transaction.initialize({
+                email: "gomitoguns@gmail.com", 
+                amount: amountConverted * quantity,
+                   refrence: paymentReference, 
+            });
 
+            const{ authorization_url, access_code} = response.data;
+            console.log(response)
+        
+            // removing quantity bought from stocked quantity
+        
+            const productData = {
+                product,
+                price,
+                email,
+                company,
+                location,
+                quantity,
+                phoneNumber
+            };
+        
+            // refresh mmenu stocked data, only after payment is made for the deducted ones
+            const refreshedMenu = await purchaseddetails.create(productData);
+        
+            res.status(200).json({
+                authorization_url,
+                paymentReference,
+                refreshedMenu
+            });
 
-    const response = await paystack.transaction.initialize({
-        email: "gomitoguns@gmail.com", 
-        amount: amountConverted * quantity,
-           refrence: paymentReference, 
-    });
-
-    const{ authorization_url, access_code} = response.data;
-    console.log(response)
-
-    // removing quantity bought from stocked quantity
-
-    const productData = {
-        product,
-        price,
-        email,
-        company,
-        location,
-        quantity,
-        phoneNumber
-    };
-
-    // refresh mmenu stocked data, only after payment is made for the deducted ones
-    const refreshedMenu = await purchaseddetails.create(productData);
-
-    res.status(200).json({
-        authorization_url,
-        paymentReference,
-        refreshedMenu
-    });
+        }else{ res.status(404).json({ message: "Product not found" });
+    }
+}
 }catch(error){
     res.status(500).json({error:"Payment Error" })
 }
 
 }
+
+const paycart = async(req, res, next )=>{
+
+ try{   let{ 
+        email,
+        product,
+        price,
+        quantity,
+          company,
+          location,
+          phoneNumber
+        } = req.body;
+
+
+            // Calculate the total amount based on the items in the cart
+      const cart= await Cartmodel.find({email})
+      const totalAmount = cart.reduce((total, item) => total + item.price, 0);
+
+      function generatePaymentReference() {
+        const randomString = crypto.randomBytes(16).toString('hex');
+        return randomString;
+      }
+
+       // Use the Paystack API to initiate payment
+       const paymentReference = generatePaymentReference();
+
+       const payResponse = await paystack.transaction.initialize({
+         email,
+         amount: totalAmount * 100, // Paystack expects amount in kobo
+         reference: paymentReference,
+       });
+ 
+       const { authorization_url, access_code } = payResponse.data;
+ 
+       const productData = {
+         product,
+         price,
+         email,
+         company,
+         location,
+         quantity,
+         paymentReference,
+         phoneNumber,
+       };
+ 
+       const refreshedMenu = await purchaseddetails.create(productData);
+ 
+       res.status(200).json({
+         authorization_url,
+         access_code,
+         cart,
+         refreshedMenu,
+       });
+     } catch (error) {
+       console.error(error);
+       res.status(500).json({ message: 'Error initiating payment' });
+     }
+
+    }
+    
 
 function listmenubyID(req, res){
     const id =  req.params.id;
@@ -817,7 +998,7 @@ const deleteUser = (req, res)=>{
         return;
         */
 
-        usermodel.deleteOne({_id: userUID})
+        usermodel.deleteOne({email})
         .then((done)=> {
             
             res.status(200).json({message: "Deleted Successfully", done})
@@ -953,5 +1134,9 @@ acceptForgetPassword,
 findproduct, 
 Add_To_Cart,
  cart, 
+ paycart,
+ Admins,
+ adminlogin,
+ updateproductbyId,
  paymentformenu};
   

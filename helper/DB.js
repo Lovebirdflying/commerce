@@ -33,6 +33,25 @@ const userSchema = new mongoose.Schema({
     */
 );
 
+
+const AdminSchema = new mongoose.Schema({
+    email: { 
+        type: String, 
+        required: true,
+        unique : true }, 
+    name: { 
+        type: String, 
+        required: true }, 
+    password:{
+        type: String,
+        required:true},
+   DateCreted : {
+    type:Date,
+    default:Date.now},
+  });
+  
+
+
 const menuSchema = new mongoose.Schema({
     product: {
         type: String,
@@ -108,6 +127,7 @@ const cartSchema = new mongoose.Schema({
         type: Number,
         required: true,
     },
+  
     DateCreated: {
         type: Date, default: Date.now
     },
@@ -147,7 +167,7 @@ const ledgerSchema = new mongoose.Schema({
  }
 })
 
-
+const Admin = mongoose.model('Admin', AdminSchema);
 const purchaseddetails = mongoose.model(`purchaseddetails`, ledgerSchema)
 const Cartmodel = mongoose.model('cart', cartSchema)
 //const Productmodel = mongoose.model('product', ProductSchema)
@@ -156,5 +176,5 @@ const usermodel = mongoose.model("user", userSchema)
 const menumodel = mongoose.model("menu", menuSchema)
 //const Customermodel = mongoose.model("Euser", CustomerSchema)
 
-module.exports = {usermodel, menumodel, tokenmodel, Cartmodel, purchaseddetails}
+module.exports = {usermodel, Admin, menumodel, tokenmodel, Cartmodel, purchaseddetails}
 
