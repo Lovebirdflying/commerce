@@ -299,15 +299,15 @@ try{
 // find product
 const findproduct = async(req, res, next)=> {
     try{
-        const productname = req.body
+        const productName = req.params.productName;
 
-        const productfound = await menumodel.findOne({product: productname}, {price:1 }, {quantity: 1})
+        const productfound = await menumodel.findOne({product: productName}, {price:1, quantity: 1})
        
         if(productfound){
 
-            res.status(200).json({ Message: productname, price: productname.price})
+            res.status(200).json({ Message: productName, price: productName.price})
         }else{ 
-            res.status(404).json({ message: `Product ${productname} not found`})
+            res.status(404).json({ message: `Product ${productName} not found`})
         }
     }catch(error){
         console.error(error);

@@ -50,7 +50,7 @@ app.post("/login/menu",Middlewareauthentication,checkUserRole('seller'), Product
 app.post("/forgetpassword", forgetpassword);
 app.get("/user/:UID", finduserId);
 app.get("/showmenu", showMenu)
-app.patch("/login/updatemenu", Middlewareauthentication,checkUserRole('seller'),  updateproductbyId)
+app.patch("/login/:updatemenu", Middlewareauthentication,checkUserRole('seller'),  updateproductbyId)
 app.get("/user/menulist/:id", listmenubyID);
 app.patch("/updatemenu/:id", updatemenu);
 app.get("/user/:userID", getUser);
@@ -62,7 +62,7 @@ app.post("/webhook", webhook);
 app.post("/acceptForgetPassword", acceptForgetPassword);
 app.post("/add-to-cart", Add_To_Cart);
 app.get("/cart", cart);
-app.get("/searchproduct", findproduct);
+app.get("/productname", findproduct);
 app.post("/paymenu", paymentformenu)
 // Handle 404 Not Found error
 
